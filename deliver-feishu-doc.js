@@ -178,11 +178,17 @@ async function createDoc(token, title, markdown) {
   const docUrl   = `https://feishu.cn/docx/${docToken}`;
 
   // 写入文档内容
-  await post(
+  console.log(`📝 写入 ${blocks.length} 个 blocks...`);
+  const writeResult = await post(
     `https://open.feishu.cn/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}/children`,
     { children: blocks, index: 0 },
     token
   );
+  if (writeResult.code !== 0) {
+    console.error('❌ blocks 写入失败:', writeResult.code, writeResult.msg);
+  } else {
+    console.log('✅ blocks 写入成功');
+  }
 
   // 设置链接分享权限为「组织内获得链接的人可查看」
   const permResult = await fetch(
