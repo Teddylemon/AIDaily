@@ -110,32 +110,29 @@ function markdownToBlocks(markdown) {
     // 空行：标题后面的空行直接跳过，避免间距过大
     if (!line) {
       if (!prevWasHeading) {
-        blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: '' } }] } });
+        blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: '' } }], style: {} } });
       }
       prevWasHeading = false;
       continue;
     }
 
-    // H1 → 飞书文档不支持子块用 H1，降级为 H2
+    // H1
     if (line.startsWith('# ')) {
-      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(2)) } });
+      blocks.push({ block_type: 3, heading1: { elements: parseInline(line.slice(2)), style: {} } });
       prevWasHeading = true;
       continue;
     }
 
-    // H2 → H3
+    // H2
     if (line.startsWith('## ')) {
-      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(3)) } });
+      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(3)), style: {} } });
       prevWasHeading = true;
       continue;
     }
 
-    // H3 → 粗体段落
+    // H3
     if (line.startsWith('### ')) {
-      const els = parseInline(line.slice(4)).map(el =>
-        el.text_run ? { text_run: { ...el.text_run, text_element_style: { ...(el.text_run.text_element_style||{}), bold: true } } } : el
-      );
-      blocks.push({ block_type: 2, text: { elements: els } });
+      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(4)), style: {} } });
       prevWasHeading = true;
       continue;
     }
@@ -144,18 +141,18 @@ function markdownToBlocks(markdown) {
 
     // 无序列表
     if (line.match(/^[-*] /)) {
-      blocks.push({ block_type: 12, bullet: { elements: parseInline(line.slice(2)) } });
+      blocks.push({ block_type: 12, bullet: { elements: parseInline(line.slice(2)), style: {} } });
       continue;
     }
 
     // 有序列表
     if (line.match(/^\d+\. /)) {
-      blocks.push({ block_type: 13, ordered: { elements: parseInline(line.replace(/^\d+\. /, '')) } });
+      blocks.push({ block_type: 13, ordered: { elements: parseInline(line.replace(/^\d+\. /, '')), style: {} } });
       continue;
     }
 
     // 普通段落
-    blocks.push({ block_type: 2, text: { elements: parseInline(line) } });
+    blocks.push({ block_type: 2, text: { elements: parseInline(line), style: {} } });
   }
 
   return blocks;
@@ -180,58 +177,17 @@ async function createDoc(token, title, markdown) {
   const docToken = data.data.document.document_id;
   const docUrl   = `https://feishu.cn/docx/${docToken}`;
 
-  // 清理 blocks：过滤掉可能导致 field validation failed 的问题
-  const cleanBlocks = blocks.map(block => {
-    // 深度清理每个 block 的 elements，去掉空 url、空 content
-    const cleanElements = (elements) => {
-      if (!elements) return elements;
-      return elements
-        .map(el => {
-          if (!el.text_run) return el;
-          const tr = { ...el.text_run };
-          // 过滤掉 content 为空或纯空格的 element
-          if (!tr.content && tr.content !== 0) return null;
-          if (typeof tr.content === 'string' && !tr.content.trim()) return null;
-          // 清理 text_element_style
-          if (tr.text_element_style) {
-            const style = { ...tr.text_element_style };
-            // link.url 不能为空
-            if (style.link && !style.link.url) delete style.link;
-            // 去掉空的 style 对象
-            if (Object.keys(style).length === 0) delete tr.text_element_style;
-            else tr.text_element_style = style;
-          }
-          return { text_run: tr };
-        })
-        .filter(Boolean);
-    };
-
-    const b = { block_type: block.block_type };
-    if (block.text)    b.text    = { ...block.text,    elements: cleanElements(block.text.elements) };
-    if (block.heading1) b.heading1 = { ...block.heading1, elements: cleanElements(block.heading1.elements) };
-    if (block.heading2) b.heading2 = { ...block.heading2, elements: cleanElements(block.heading2.elements) };
-    if (block.heading3) b.heading3 = { ...block.heading3, elements: cleanElements(block.heading3.elements) };
-    if (block.bullet)  b.bullet  = { ...block.bullet,  elements: cleanElements(block.bullet.elements) };
-    if (block.ordered) b.ordered = { ...block.ordered, elements: cleanElements(block.ordered.elements) };
-    return b;
-  });
-
-  // 分批写入（每批最多 50 个），避免单次请求过大
-  console.log(`📝 写入 ${cleanBlocks.length} 个 blocks（分批）...`);
-  const BATCH = 50;
-  for (let i = 0; i < cleanBlocks.length; i += BATCH) {
-    const batch = cleanBlocks.slice(i, i + BATCH);
+  // 写入文档内容（分批，每批30个，避免超出飞书单次限制）
+  const BATCH_SIZE = 30;
+  for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
+    const batch = blocks.slice(i, i + BATCH_SIZE);
     const writeResult = await post(
       `https://open.feishu.cn/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}/children`,
       { children: batch, index: i },
       token
     );
     if (writeResult.code !== 0) {
-      console.error(`❌ 第 ${i}-${i+batch.length} 批写入失败:`, writeResult.code, writeResult.msg);
-      // 打印第一个 block 帮助调试
-      console.error('问题 batch 第一个 block:', JSON.stringify(batch[0], null, 2));
-    } else {
-      console.log(`✅ 第 ${i+1}-${i+batch.length} 批写入成功`);
+      console.warn(`⚠️  第 ${i+1}-${i+batch.length} 批写入失败:`, writeResult.code, writeResult.msg);
     }
   }
 
