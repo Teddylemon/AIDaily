@@ -110,7 +110,7 @@ function markdownToBlocks(markdown) {
     // 空行：标题后面的空行直接跳过，避免间距过大
     if (!line) {
       if (!prevWasHeading) {
-        blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: '' } }], style: {} } });
+        blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: '' } }] } });
       }
       prevWasHeading = false;
       continue;
@@ -118,14 +118,14 @@ function markdownToBlocks(markdown) {
 
     // H1 → 飞书文档不支持子块用 H1，降级为 H2
     if (line.startsWith('# ')) {
-      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(2)), style: {} } });
+      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(2)) } });
       prevWasHeading = true;
       continue;
     }
 
     // H2 → H3
     if (line.startsWith('## ')) {
-      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(3)), style: {} } });
+      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(3)) } });
       prevWasHeading = true;
       continue;
     }
@@ -135,7 +135,7 @@ function markdownToBlocks(markdown) {
       const els = parseInline(line.slice(4)).map(el =>
         el.text_run ? { text_run: { ...el.text_run, text_element_style: { ...(el.text_run.text_element_style||{}), bold: true } } } : el
       );
-      blocks.push({ block_type: 2, text: { elements: els, style: {} } });
+      blocks.push({ block_type: 2, text: { elements: els } });
       prevWasHeading = true;
       continue;
     }
@@ -144,18 +144,18 @@ function markdownToBlocks(markdown) {
 
     // 无序列表
     if (line.match(/^[-*] /)) {
-      blocks.push({ block_type: 12, bullet: { elements: parseInline(line.slice(2)), style: {} } });
+      blocks.push({ block_type: 12, bullet: { elements: parseInline(line.slice(2)) } });
       continue;
     }
 
     // 有序列表
     if (line.match(/^\d+\. /)) {
-      blocks.push({ block_type: 13, ordered: { elements: parseInline(line.replace(/^\d+\. /, '')), style: {} } });
+      blocks.push({ block_type: 13, ordered: { elements: parseInline(line.replace(/^\d+\. /, '')) } });
       continue;
     }
 
     // 普通段落
-    blocks.push({ block_type: 2, text: { elements: parseInline(line), style: {} } });
+    blocks.push({ block_type: 2, text: { elements: parseInline(line) } });
   }
 
   return blocks;
