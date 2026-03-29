@@ -116,23 +116,26 @@ function markdownToBlocks(markdown) {
       continue;
     }
 
-    // H1
+    // H1 → 飞书文档不支持子块用 H1，降级为 H2
     if (line.startsWith('# ')) {
-      blocks.push({ block_type: 3, heading1: { elements: parseInline(line.slice(2)), style: {} } });
+      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(2)), style: {} } });
       prevWasHeading = true;
       continue;
     }
 
-    // H2
+    // H2 → H3
     if (line.startsWith('## ')) {
-      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(3)), style: {} } });
+      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(3)), style: {} } });
       prevWasHeading = true;
       continue;
     }
 
-    // H3
+    // H3 → 粗体段落
     if (line.startsWith('### ')) {
-      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(4)), style: {} } });
+      const els = parseInline(line.slice(4)).map(el =>
+        el.text_run ? { text_run: { ...el.text_run, text_element_style: { ...(el.text_run.text_element_style||{}), bold: true } } } : el
+      );
+      blocks.push({ block_type: 2, text: { elements: els, style: {} } });
       prevWasHeading = true;
       continue;
     }
@@ -186,8 +189,9 @@ async function createDoc(token, title, markdown) {
         .map(el => {
           if (!el.text_run) return el;
           const tr = { ...el.text_run };
-          // 过滤掉 content 为空的 element
+          // 过滤掉 content 为空或纯空格的 element
           if (!tr.content && tr.content !== 0) return null;
+          if (typeof tr.content === 'string' && !tr.content.trim()) return null;
           // 清理 text_element_style
           if (tr.text_element_style) {
             const style = { ...tr.text_element_style };
