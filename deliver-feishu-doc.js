@@ -177,17 +177,58 @@ async function createDoc(token, title, markdown) {
   const docToken = data.data.document.document_id;
   const docUrl   = `https://feishu.cn/docx/${docToken}`;
 
-  // 写入文档内容
-  console.log(`📝 写入 ${blocks.length} 个 blocks...`);
-  const writeResult = await post(
-    `https://open.feishu.cn/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}/children`,
-    { children: blocks, index: 0 },
-    token
-  );
-  if (writeResult.code !== 0) {
-    console.error('❌ blocks 写入失败:', writeResult.code, writeResult.msg);
-  } else {
-    console.log('✅ blocks 写入成功');
+  // 清理 blocks：过滤掉可能导致 field validation failed 的问题
+  const cleanBlocks = blocks.map(block => {
+    // 深度清理每个 block 的 elements，去掉空 url、空 content
+    const cleanElements = (elements) => {
+      if (!elements) return elements;
+      return elements
+        .map(el => {
+          if (!el.text_run) return el;
+          const tr = { ...el.text_run };
+          // 过滤掉 content 为空的 element
+          if (!tr.content && tr.content !== 0) return null;
+          // 清理 text_element_style
+          if (tr.text_element_style) {
+            const style = { ...tr.text_element_style };
+            // link.url 不能为空
+            if (style.link && !style.link.url) delete style.link;
+            // 去掉空的 style 对象
+            if (Object.keys(style).length === 0) delete tr.text_element_style;
+            else tr.text_element_style = style;
+          }
+          return { text_run: tr };
+        })
+        .filter(Boolean);
+    };
+
+    const b = { block_type: block.block_type };
+    if (block.text)    b.text    = { ...block.text,    elements: cleanElements(block.text.elements) };
+    if (block.heading1) b.heading1 = { ...block.heading1, elements: cleanElements(block.heading1.elements) };
+    if (block.heading2) b.heading2 = { ...block.heading2, elements: cleanElements(block.heading2.elements) };
+    if (block.heading3) b.heading3 = { ...block.heading3, elements: cleanElements(block.heading3.elements) };
+    if (block.bullet)  b.bullet  = { ...block.bullet,  elements: cleanElements(block.bullet.elements) };
+    if (block.ordered) b.ordered = { ...block.ordered, elements: cleanElements(block.ordered.elements) };
+    return b;
+  });
+
+  // 分批写入（每批最多 50 个），避免单次请求过大
+  console.log(`📝 写入 ${cleanBlocks.length} 个 blocks（分批）...`);
+  const BATCH = 50;
+  for (let i = 0; i < cleanBlocks.length; i += BATCH) {
+    const batch = cleanBlocks.slice(i, i + BATCH);
+    const writeResult = await post(
+      `https://open.feishu.cn/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}/children`,
+      { children: batch, index: i },
+      token
+    );
+    if (writeResult.code !== 0) {
+      console.error(`❌ 第 ${i}-${i+batch.length} 批写入失败:`, writeResult.code, writeResult.msg);
+      // 打印第一个 block 帮助调试
+      console.error('问题 batch 第一个 block:', JSON.stringify(batch[0], null, 2));
+    } else {
+      console.log(`✅ 第 ${i+1}-${i+batch.length} 批写入成功`);
+    }
   }
 
   // 设置链接分享权限为「组织内获得链接的人可查看」
