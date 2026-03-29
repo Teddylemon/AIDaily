@@ -2,10 +2,10 @@ name: AI Builders Digest
 
 on:
   schedule:
-    # 每天 UTC 01:00 = 北京时间 09:00（周一到周五）
-    - cron: '0 1 * * 1-5'
-    # 每周六 UTC 01:00 = 北京时间 09:00
-    - cron: '0 1 * * 6'
+    # 周一到周六 UTC 01:00 = 北京时间 09:00 发日报
+    - cron: '0 1 * * 1-6'
+    # 周日 UTC 01:00 = 北京时间 09:00 发周报
+    - cron: '0 1 * * 0'
 
   # 支持手动触发（/daily 和 /weekly 指令通过 Cloudflare Worker 调用）
   workflow_dispatch:
@@ -47,7 +47,7 @@ jobs:
           # workflow_dispatch 用输入参数，schedule 根据星期判断
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-          elif [ "$(date +%u)" = "6" ]; then
+          elif [ "$(date +%u)" = "7" ]; then
             echo "mode=weekly" >> $GITHUB_OUTPUT
           else
             echo "mode=daily" >> $GITHUB_OUTPUT
