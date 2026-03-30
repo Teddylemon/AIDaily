@@ -2,10 +2,10 @@ name: AI Builders Digest
 
 on:
   schedule:
-    # 周一到周六 UTC 01:00 = 北京时间 09:00 发日报
-    - cron: '0 1 * * 1-6'
-    # 周日 UTC 01:00 = 北京时间 09:00 发周报
-    - cron: '0 1 * * 0'
+    # 周一到周六 UTC 01:00 = 北京时间 09:20 发日报
+    - cron: '20 1 * * 1-6'
+    # 周日 UTC 01:00 = 北京时间 09:20 发周报
+    - cron: '20 1 * * 0'
 
   # 支持手动触发（/daily 和 /weekly 指令通过 Cloudflare Worker 调用）
   workflow_dispatch:
