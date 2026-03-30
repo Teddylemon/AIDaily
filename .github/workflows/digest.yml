@@ -4,7 +4,6 @@ on:
   schedule:
     - cron: '20 1 * * 1-6'
     - cron: '20 1 * * 0'
-
   workflow_dispatch:
     inputs:
       mode:
@@ -41,7 +40,6 @@ jobs:
       - name: Determine mode
         id: mode
         run: |
-          # workflow_dispatch 用输入参数，schedule 根据星期判断
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
           elif [ "$(date +%u)" = "7" ]; then
