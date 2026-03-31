@@ -110,7 +110,7 @@ function markdownToBlocks(markdown) {
     // 空行：标题后面的空行直接跳过，避免间距过大
     if (!line) {
       if (!prevWasHeading) {
-        blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: '' } }], style: {} } });
+        blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: '' } }] } });
       }
       prevWasHeading = false;
       continue;
@@ -118,21 +118,21 @@ function markdownToBlocks(markdown) {
 
     // H1
     if (line.startsWith('# ')) {
-      blocks.push({ block_type: 3, heading1: { elements: parseInline(line.slice(2)), style: {} } });
+      blocks.push({ block_type: 3, heading1: { elements: parseInline(line.slice(2)) } });
       prevWasHeading = true;
       continue;
     }
 
     // H2
     if (line.startsWith('## ')) {
-      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(3)), style: {} } });
+      blocks.push({ block_type: 4, heading2: { elements: parseInline(line.slice(3)) } });
       prevWasHeading = true;
       continue;
     }
 
     // H3
     if (line.startsWith('### ')) {
-      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(4)), style: {} } });
+      blocks.push({ block_type: 5, heading3: { elements: parseInline(line.slice(4)) } });
       prevWasHeading = true;
       continue;
     }
@@ -141,18 +141,18 @@ function markdownToBlocks(markdown) {
 
     // 无序列表
     if (line.match(/^[-*] /)) {
-      blocks.push({ block_type: 12, bullet: { elements: parseInline(line.slice(2)), style: {} } });
+      blocks.push({ block_type: 12, bullet: { elements: parseInline(line.slice(2)) } });
       continue;
     }
 
     // 有序列表
     if (line.match(/^\d+\. /)) {
-      blocks.push({ block_type: 13, ordered: { elements: parseInline(line.replace(/^\d+\. /, '')), style: {} } });
+      blocks.push({ block_type: 13, ordered: { elements: parseInline(line.replace(/^\d+\. /, '')) } });
       continue;
     }
 
     // 普通段落
-    blocks.push({ block_type: 2, text: { elements: parseInline(line), style: {} } });
+    blocks.push({ block_type: 2, text: { elements: parseInline(line) } });
   }
 
   return blocks;
@@ -177,8 +177,8 @@ async function createDoc(token, title, markdown) {
   const docToken = data.data.document.document_id;
   const docUrl   = `https://feishu.cn/docx/${docToken}`;
 
-  // 写入文档内容（分批，每批30个，避免超出飞书单次限制）
-  const BATCH_SIZE = 30;
+  // 写入文档内容（分批，每批20个）
+  const BATCH_SIZE = 20;
   for (let i = 0; i < blocks.length; i += BATCH_SIZE) {
     const batch = blocks.slice(i, i + BATCH_SIZE);
     const writeResult = await post(
@@ -188,6 +188,7 @@ async function createDoc(token, title, markdown) {
     );
     if (writeResult.code !== 0) {
       console.warn(`⚠️  第 ${i+1}-${i+batch.length} 批写入失败:`, writeResult.code, writeResult.msg);
+      console.warn('问题 block:', JSON.stringify(batch[0]));
     }
   }
 
